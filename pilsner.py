@@ -8,8 +8,7 @@ PLACEMENT_FILE = expanduser('~/out.json')
 class PilsnerOperator(bpy.types.Operator):
     """Tooltip"""
     bl_idname = "scene.pilsner"
-    bl_label = "Load Pils JSON into current scene"
-    file_watching_ready = False
+    bl_label = "Autolayout with pilsner"
 
     @classmethod
     def poll(cls, context):
@@ -23,22 +22,24 @@ class PilsnerOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         self.execute(context)
-        context.window_manager.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
+        return {'OK'}
 
     def execute(self, context):
-        self.last_placement_mtime = os.stat(PLACEMENT_FILE).st_mtime
-
         self.clearMeshes()
 
-        with open(PLACEMENT_FILE) as json_data:
-            placements = json.load(json_data)
+        # Invoke global lager executable
+        placementsJson = os.popen('lager dustsucker').read()
+        entities = json.loads(placementsJson)
 
-            for placement in placements:
-                className = placement['className'];
-                position = placement['position'];
-                scale = placement['scale'];
-                orientation = placement['orientation'];
+        for ent in entities:
+            for placement in ent['placements']:
+                print(placement)
+
+                position = placement['pose']['position'];
+                scale = placement['pose']['scale'];
+                orientation = placement['pose']['orientation'];
+
+                className = placement['name'];
 
                 parent = self.make_placed_obj_parent(className, position, scale, orientation)
 
@@ -51,25 +52,7 @@ class PilsnerOperator(bpy.types.Operator):
                     #group.objects.link(placed_obj)
                     #placed_obj.delta_scale = [0.1, 0.1, 0.1]
 
-        return {'RUNNING_MODAL'}
-
-    def execute_if_placements_changed(self, context):
-        print("Checking if placement changed")
-
-        new_placement_time = os.stat(PLACEMENT_FILE).st_mtime
-
-        if new_placement_time != self.last_placement_mtime:
-            self.last_placement_mtime = new_placement_time
-            self.execute(context)
-
-    def modal(self, context, event):
-        print(event.type)
-
-        if event.type == 'ESC':
-            return {'FINISHED'}
-        else:
-            self.execute_if_placements_changed(context)
-            return {'RUNNING_MODAL'}
+        return {'OK'}
 
     """
     Creates a parent for the groups in the loaded obj and sets the transformation
@@ -108,18 +91,6 @@ class PilsnerOperator(bpy.types.Operator):
         for item in bpy.data.meshes:
             bpy.data.meshes.remove(item)
 
-    """
-    Sets up unix style signal handling to re-execute the operator when the
-    placement file changed. Will probably not work with windows.
-    """
-    def init_file_watching(self):
-        if self.file_watching_ready == False:
-            def handler():
-                print("Re-running pilsner since placement file changed")
-                self()
-
-            self.file_watching_ready = True
-
 
 def register():
     bpy.utils.register_class(PilsnerOperator)
@@ -130,4 +101,4 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-    bpy.ops.scene.pilsner('INVOKE_DEFAULT')
+    #bpy.ops.scene.pilsner('INVOKE_DEFAULT')
