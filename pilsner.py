@@ -32,24 +32,32 @@ class PilsnerOperator(bpy.types.Operator):
         self.clearMeshes()
 
         with open(PLACEMENT_FILE) as json_data:
-            placements = json.load(json_data)
+            entities = json.load(json_data)
 
-            for placement in placements:
-                className = placement['className'];
-                position = placement['position'];
-                scale = placement['scale'];
-                orientation = placement['orientation'];
+            for ent in entities:
+                class_name = ent['meta']['id'];
+                position = ent['pose']['position'];
+                scale = ent['pose']['scale'];
+                orientation = ent['pose']['orientation'];
 
-                parent = self.make_placed_obj_parent(className, position, scale, orientation)
+                entity_obj = self.make_placed_obj_parent(class_name, position, scale, orientation)
 
-                bpy.ops.import_scene.obj(filepath = placement['model'])
+                for placement in ent['placements']:
+                    pl_position = placement['pose']['position']
+                    pl_scale = placement['pose']['scale']
+                    pl_orientation = placement['pose']['orientation']
+                    pl_mesh = placement['mesh']
 
-                for placed_obj in bpy.context.selected_objects:
-                    placed_obj.parent = parent
-                    #bpy.ops.group.objects_add_active(group=className)
-                    #placed_obj.name = "Holodrio"
-                    #group.objects.link(placed_obj)
-                    #placed_obj.delta_scale = [0.1, 0.1, 0.1]
+                    parent = self.make_placed_obj_parent(placement['name'], pl_position, pl_scale, pl_orientation)
+                    parent.parent = entity_obj
+
+                    if pl_mesh.endswith(".obj") or pl_mesh.endswith(".OBJ"):
+                        bpy.ops.import_scene.obj(filepath = pl_mesh)
+                    else:
+                        bpy.ops.import_scene.fbx(filepath = pl_mesh)
+
+                    for placed_obj in bpy.context.selected_objects:
+                        placed_obj.parent = parent
 
         return {'RUNNING_MODAL'}
 
@@ -75,17 +83,20 @@ class PilsnerOperator(bpy.types.Operator):
     Creates a parent for the groups in the loaded obj and sets the transformation
     as specified in the JSON
     """
-    def make_placed_obj_parent(self, className, position, scale, orientation):
+    def make_placed_obj_parent(self, class_name, position, scale, orientation):
+        position = (position[0], position[2], position[1])
+        scale = (scale[0], scale[2], scale[1])
+
         # Create object with empty mesh
-        empty_mesh = bpy.data.meshes.new(className)
-        parent = bpy.data.objects.new(className, empty_mesh)
+        empty_mesh = bpy.data.meshes.new(class_name)
+        parent = bpy.data.objects.new(class_name, empty_mesh)
 
         # And link it with the current scene
         bpy.context.scene.objects.link(parent)
 
         parent.location = position
         parent.scale = scale
-        parent.rotation_euler = orientation
+        parent.rotation_quaternion = orientation
 
         return parent
 
