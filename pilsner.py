@@ -31,14 +31,18 @@ class PilsnerOperator(bpy.types.Operator):
         placementsJson = os.popen('lager dustsucker').read()
         entities = json.loads(placementsJson)
 
+        # Create top level pilsner object
+        pilsner_obj = self.make_placed_obj_parent("pilsner", [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [1, 0, 0, 0])
+        pilsner_obj.rotation_euler = [-1.5707, 0, 0]
+
         for ent in entities:
             className = ent['meta']['name'];
             position =  ent['pose']['position'];
             scale =  ent['pose']['scale'];
             orientation =  ent['pose']['orientation'];
-            print(orientation)
 
             entity_obj = self.make_placed_obj_parent(className, position, scale, orientation)
+            entity_obj.parent = pilsner_obj
 
             for placement in ent['placements']:
                 pl_position = placement['pose']['position'];
@@ -47,9 +51,12 @@ class PilsnerOperator(bpy.types.Operator):
                 pl_mesh = placement['mesh']
                 pl_name = placement['name']
 
-
                 parent = self.make_placed_obj_parent(pl_name, pl_position, pl_scale, pl_orientation)
                 parent.parent = entity_obj
+
+                compensator = self.make_placed_obj_parent("compensator", [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [1, 0, 0, 0])
+                compensator.rotation_euler = [1.5707, 0, 0]
+                compensator.parent = parent
 
                 if pl_mesh.endswith(".obj") or pl_mesh.endswith(".OBJ"):
                     bpy.ops.import_scene.obj(filepath = pl_mesh)
@@ -57,7 +64,7 @@ class PilsnerOperator(bpy.types.Operator):
                     bpy.ops.import_scene.fbx(filepath = pl_mesh)
 
                 for placed_obj in bpy.context.selected_objects:
-                    placed_obj.parent = parent
+                    placed_obj.parent = compensator
 
         return {'FINISHED'}
 
@@ -66,8 +73,9 @@ class PilsnerOperator(bpy.types.Operator):
     as specified in the JSON
     """
     def make_placed_obj_parent(self, className, position, scale, orientation):
-        position = (position[0], position[2], position[1])
-        scale = (scale[0], scale[2], scale[1])
+        # Blender has Y and Z flipped compared to OpenGL coordinate system
+        position = (position[0], position[1], position[2])
+        scale = (scale[0], scale[1], scale[2])
 
         # Create object with empty mesh
         empty_mesh = bpy.data.meshes.new(className)
