@@ -28,7 +28,7 @@ class PilsnerOperator(bpy.types.Operator):
         self.clearMeshes()
 
         # Invoke global lager executable
-        placementsJson = os.popen('lager dustsucker').read()
+        placementsJson = os.popen('lager --debug-placements dustsucker').read()
         entities = json.loads(placementsJson)
 
         # Create top level pilsner object
